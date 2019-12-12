@@ -1,0 +1,28 @@
+  player:
+
+  keep-inventory: false
+  keep-experience: false
+
+dimensions:
+  nether:
+
+    active: true
+    level-name: "nether"
+
+  the-end:
+
+    active: false
+    level-name: "end"
+
+developer:
+
+  folder-plugin-loader: true
+  commands: true
+
+additional-plugin-dirs:
+  # Example:
+  # - plugins-beta/
+
+level:
+  enable-mob-ai: false
+  generic-auto-mob-spawning: false
