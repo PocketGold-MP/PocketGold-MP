@@ -360,7 +360,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 	public const SPAWN_PLACEMENT_TYPE = SpawnPlacementTypes::PLACEMENT_TYPE_ON_GROUND;
 
 	public static $entityCount = 1;
-	/** @var Entity[] */
+	/** @var string[] */
 	private static $knownEntities = [];
 	/** @var string[][] */
 	private static $saveNames = [];
@@ -521,8 +521,8 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 	/** @var EntityDamageEvent|null */
 	protected $lastDamageCause = null;
 
-	/** @var Block[] */
-	protected $blocksAround = [];
+	/** @var Block[]|null */
+	protected $blocksAround = null;
 
 	/** @var float|null */
 	public $lastX = null;
@@ -690,7 +690,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 
 		$this->chunk = $this->level->getChunkAtPosition($this, false);
 		if($this->chunk === null){
-			throw new \InvalidStateException("");
+			throw new \InvalidStateException("Cannot create entities in unloaded chunks");
 		}
 
 		$this->motion = new Vector3(0, 0, 0);
@@ -811,7 +811,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 	 */
 	public function setScale(float $value) : void{
 		if($value <= 0){
-			throw new \InvalidArgumentException("");
+			throw new \InvalidArgumentException("Scale must be greater than 0");
 		}
 		$multiplier = $value / $this->getScale();
 
@@ -1064,7 +1064,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 		if($owner === null){
 			$this->propertyManager->removeProperty(self::DATA_OWNER_EID);
 		}elseif($owner->closed){
-			throw new \InvalidArgumentException("");
+			throw new \InvalidArgumentException("Supplied owning entity is garbage and cannot be used");
 		}else{
 			$this->propertyManager->setLong(self::DATA_OWNER_EID, $owner->getId());
 		}
@@ -1104,7 +1104,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 		if($target === null){
 			$this->propertyManager->removeProperty(self::DATA_TARGET_EID);
 		}elseif($target->closed){
-			throw new \InvalidArgumentException("");
+			throw new \InvalidArgumentException("Supplied target entity is garbage and cannot be used");
 		}else{
 			$this->propertyManager->setLong(self::DATA_TARGET_EID, $target->getId());
 		}
@@ -1135,7 +1135,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 	 */
 	public function getSaveId() : string{
 		if(!isset(self::$saveNames[static::class])){
-			throw new \InvalidStateException("");
+			throw new \InvalidStateException("Entity is not registered");
 		}
 		reset(self::$saveNames[static::class]);
 		return current(self::$saveNames[static::class]);
@@ -2653,7 +2653,7 @@ abstract class Entity extends Location implements Metadatable, EntityIds{
 	 * @param Player $player
 	 */
 	public function spawnTo(Player $player) : void{
-		if(!isset($this->hasSpawned[$player->getLoaderId()])){
+		if(!isset($this->hasSpawned[$player->getLoaderId()]) and $this->chunk !== null and isset($player->usedChunks[Level::chunkHash($this->chunk->getX(), $this->chunk->getZ())])){
 			$this->hasSpawned[$player->getLoaderId()] = $player;
 
 			$this->sendSpawnPacket($player);
