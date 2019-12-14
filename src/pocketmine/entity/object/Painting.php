@@ -90,9 +90,6 @@ class Painting extends Entity{
 	}
 
 	public function kill() : void{
-		if(!$this->isAlive()){
-			return;
-		}
 		parent::kill();
 
 		$drops = true;

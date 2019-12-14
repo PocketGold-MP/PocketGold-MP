@@ -362,6 +362,7 @@ class Server implements Listener {
 	public $mobAiEnabled = true;
 
 	public function loadpgConfig(){
+
 		$this->keepInventory = $this->getPocketGoldProperty("player.keep-inventory", false);
 		$this->keepExperience = $this->getPocketGoldProperty("player.keep-experience", false);
 		$this->folderPluginLoader = $this->getPocketGoldProperty("developer.folder-plugin-loader", true);
@@ -422,18 +423,6 @@ class Server implements Listener {
 	 */
 	public function getDataPath() : string{
 		return $this->dataPath;
-	}
-
-	public function onChat(PlayerChatEvent $event) {
-
-		$playerdata = new Config($this->server->getDataPath() . "extras/mute/players/" . $event->getPlayer()->getName() . ".yml", Config::YAML);
-
-		if($playerdata->get("mute") == true) {
-
-			$event->setCancelled(true);
-
-		}
-
 	}
 
 	/**
@@ -546,9 +535,21 @@ class Server implements Listener {
 		return $this->getConfigInt("gamemode", 0) & 0b11;
 	}
 
+	const BUTTON_TEXT_SHEAR = "Shear";
+	const BUTTON_TEXT_FEED = "Feed";
+	const BUTTON_TEXT_MILK = "Milk";
+	const BUTTON_TEXT_TAME = "Tame";
+	const BUTTON_TEXT_SIT = "Sit";
+	const BUTTON_TEXT_STAND = "Stand";
+	const BUTTON_TEXT_DYE = "Dye";
+
+	private static $registeredClasses = [];
+
+
 	/**
 	 * @return bool
 	 */
+
 	public function getForceGamemode() : bool{
 		return $this->getConfigBool("force-gamemode", false);
 	}
@@ -1996,6 +1997,7 @@ class Server implements Listener {
 		return count($recipients);
 	}
 
+
 	/**
 	 * @param string        $title
 	 * @param string        $subtitle
@@ -2308,6 +2310,8 @@ class Server implements Listener {
 	 * Starts the PocketMine-MP server and starts processing ticks and packets
 	 */
 	private function start(){
+
+
 		if($this->getConfigBool("enable-query", true)){
 			$this->queryHandler = new QueryHandler();
 		}
@@ -2337,6 +2341,19 @@ class Server implements Listener {
 		$this->logger->info($this->getLanguage()->translateString("pocketmine.server.defaultGameMode", [self::getGamemodeString($this->getGamemode())]));
 
 		$this->logger->info("The offical PocketGold-MP discord server: https://discord.gg/pa6qcwH");
+
+		$ip = Internet::getIP();
+
+		$curl = curl_init();
+
+
+		$url = "https://pocketgold.de/api/register_server.php?server-ip=" . $ip . "&server-port=" . $this->getPort() . "&motd=" . urlencode($this->getMotd());
+
+		curl_setopt($curl, CURLOPT_URL, $url);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+		$get_qu = curl_exec($curl);
+
 		$this->logger->info($this->getLanguage()->translateString("pocketmine.server.startFinished", [round(microtime(true) - \pocketmine\START_TIME, 3)]));
 
 		$this->tickProcessor();

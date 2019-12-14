@@ -43,12 +43,10 @@ use pocketmine\item\Item;
 use pocketmine\level\Level;
 use pocketmine\nbt\NBT;
 use pocketmine\nbt\tag\ByteArrayTag;
-use pocketmine\nbt\tag\ByteTag;
 use pocketmine\nbt\tag\CompoundTag;
-use pocketmine\nbt\tag\FloatTag;
-use pocketmine\nbt\tag\IntTag;
 use pocketmine\nbt\tag\ListTag;
 use pocketmine\nbt\tag\StringTag;
+use pocketmine\nbt\tag\IntTag;
 use pocketmine\network\mcpe\protocol\ActorEventPacket;
 use pocketmine\network\mcpe\protocol\AddPlayerPacket;
 use pocketmine\network\mcpe\protocol\LevelEventPacket;
@@ -56,9 +54,7 @@ use pocketmine\network\mcpe\protocol\LevelSoundEventPacket;
 use pocketmine\network\mcpe\protocol\PlayerListPacket;
 use pocketmine\network\mcpe\protocol\PlayerSkinPacket;
 use pocketmine\network\mcpe\protocol\types\PlayerListEntry;
-use pocketmine\network\mcpe\protocol\types\SkinAnimation;
-use pocketmine\network\mcpe\protocol\types\SkinCape;
-use pocketmine\network\mcpe\protocol\types\SkinImage;
+use pocketmine\network\mcpe\protocol\types\SkinAdapterSingleton;
 use pocketmine\Player;
 use pocketmine\utils\UUID;
 use function array_filter;
@@ -124,39 +120,13 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 	 * @throws \InvalidArgumentException
 	 */
 	protected static function deserializeSkinNBT(CompoundTag $skinTag) : Skin{
-		if($skinTag->hasTag("Name")){ // legacy format
-			$skin = Skin::fromLegacy(
-				$skinTag->getString("Name"),
-				$skinTag->hasTag("Data", StringTag::class) ? $skinTag->getString("Data") : $skinTag->getByteArray("Data"),
-				$skinTag->getByteArray("CapeData"),
-				$skinTag->getString("GeometryName"),
-				$skinTag->getByteArray("GeometryData")
-			);
-		}else{
-			$animations = [];
-			foreach($skinTag->getListTag("AnimatedImageData")->getValue() as $tag){
-				if($tag instanceof CompoundTag){
-					$animations[] = new SkinAnimation(new SkinImage($tag->getInt("ImageHeight"), $tag->getInt("ImageWidth"), $tag->getByteArray("Image")), $tag->getByte("Type"), $tag->getFloat("Frames"));
-				}
-			}
-
-			$cape = new SkinCape($skinTag->getString("CapeId"),
-				new SkinImage($skinTag->getInt("CapeImageHeight"), $skinTag->getInt("CapeImageWidth"), $skinTag->getByteArray("CapeData")),
-				boolval($skinTag->getByte("CapeOnClassicSkin", 0)));
-
-			$skin = new Skin(
-				$skinTag->getString("SkinId"),
-				new SkinImage($skinTag->getInt("SkinImageHeight"), $skinTag->getInt("SkinImageWidth"), $skinTag->getByteArray("SkinData")),
-				$skinTag->getByteArray("SkinResourcePatch", ""),
-				$cape,
-				$animations,
-				$skinTag->getByteArray("SkinGeometryData", ""),
-				$skinTag->getByteArray("SkinAnimationData", ""),
-				boolval($skinTag->getByte("PersonaSkin", 0)),
-				boolval($skinTag->getByte("PremiumSkin", 0))
-			);
-		}
-
+		$skin = new Skin(
+			$skinTag->getString("Name"),
+			$skinTag->hasTag("Data", StringTag::class) ? $skinTag->getString("Data") : $skinTag->getByteArray("Data"), //old data (this used to be saved as a StringTag in older versions of PM)
+			$skinTag->getByteArray("CapeData", ""),
+			$skinTag->getString("GeometryName", ""),
+			$skinTag->getByteArray("GeometryData", "")
+		);
 		$skin->validate();
 		return $skin;
 	}
@@ -217,7 +187,7 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 	public function sendSkin(?array $targets = null) : void{
 		$pk = new PlayerSkinPacket();
 		$pk->uuid = $this->getUniqueId();
-		$pk->skin = $this->skin;
+		$pk->skin = SkinAdapterSingleton::get()->toSkinData($this->skin);
 		$this->server->broadcastPacket($targets ?? $this->hasSpawned, $pk);
 	}
 
@@ -654,7 +624,7 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 			$this->setNameTag($this->namedtag->getString("NameTag"));
 		}
 
-		$this->uuid = UUID::fromData((string) $this->getId(), $this->skin->getSkinImage()->getData(), $this->getNameTag());
+		$this->uuid = UUID::fromData((string) $this->getId(), $this->skin->getSkinData(), $this->getNameTag());
 	}
 
 	protected function initEntity() : void{
@@ -835,7 +805,7 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 		$this->namedtag->setInt("foodLevel", (int) $this->getFood(), true);
 		$this->namedtag->setFloat("foodExhaustionLevel", $this->getExhaustion(), true);
 		$this->namedtag->setFloat("foodSaturationLevel", $this->getSaturation(), true);
-		$this->namedtag->setInt("foodTickTimer", (int) $this->foodTickTimer);
+		$this->namedtag->setInt("foodTickTimer", $this->foodTickTimer);
 
 		$this->namedtag->setInt("XpLevel", $this->getXpLevel());
 		$this->namedtag->setFloat("XpP", $this->getXpProgress());
@@ -886,28 +856,11 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 
 		if($this->skin !== null){
 			$this->namedtag->setTag(new CompoundTag("Skin", [
-				new StringTag("SkinId", $this->skin->getSkinId()),
-				new ByteArrayTag("SkinData", $this->skin->getSkinImage()->getData()),
-				new IntTag("SkinImageHeight", $this->skin->getSkinImage()->getHeight()),
-				new IntTag("SkinImageWidth", $this->skin->getSkinImage()->getWidth()),
-				new ByteArrayTag("CapeData", $this->skin->getCape()->getImage()->getData()),
-				new StringTag("CapeId", $this->skin->getCape()->getId()),
-				new IntTag("CapeImageHeight", $this->skin->getCape()->getImage()->getHeight()),
-				new IntTag("CapeImageWidth", $this->skin->getCape()->getImage()->getWidth()),
-				new ListTag("AnimatedImageData", array_map(function(SkinAnimation $animation) : CompoundTag{
-					return new CompoundTag("", [
-						new ByteTag("Type", $animation->getType()),
-						new FloatTag("Frames", $animation->getFrames()),
-						new ByteArrayTag("Image", $animation->getImage()->getData()),
-						new IntTag("ImageHeight", $animation->getImage()->getHeight()),
-						new IntTag("ImageWidth", $animation->getImage()->getWidth())
-					]);
-				}, $this->skin->getAnimations()), NBT::TAG_Compound),
-				new ByteArrayTag("SkinResourcePatch", $this->skin->getResourcePatch()),
-				new ByteArrayTag("SkinGeometryData", $this->skin->getGeometryData()),
-				new ByteArrayTag("SkinAnimationData", $this->skin->getAnimationData()),
-				new ByteTag("PersonaSkin", intval($this->skin->isPersona())),
-				new ByteTag("PremiumSkin", intval($this->skin->isPremium()))
+				new StringTag("Name", $this->skin->getSkinId()),
+				new ByteArrayTag("Data", $this->skin->getSkinData()),
+				new ByteArrayTag("CapeData", $this->skin->getCapeData()),
+				new StringTag("GeometryName", $this->skin->getGeometryName()),
+				new ByteArrayTag("GeometryData", $this->skin->getGeometryData())
 			]));
 		}
 	}
@@ -925,7 +878,7 @@ class Human extends Creature implements ProjectileSource, InventoryHolder{
 			/* we don't use Server->updatePlayerListData() because that uses batches, which could cause race conditions in async compression mode */
 			$pk = new PlayerListPacket();
 			$pk->type = PlayerListPacket::TYPE_ADD;
-			$pk->entries = [PlayerListEntry::createAdditionEntry($this->uuid, $this->id, $this->getName(), $this->skin)];
+			$pk->entries = [PlayerListEntry::createAdditionEntry($this->uuid, $this->id, $this->getName(), SkinAdapterSingleton::get()->toSkinData($this->skin))];
 			$player->dataPacket($pk);
 		}
 

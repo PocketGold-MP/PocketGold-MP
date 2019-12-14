@@ -46,11 +46,20 @@
       <option name="presentableId" value="Default" />
       <updated>1576174071344</updated>
       <workItem from="1576174072478" duration="2422000" />
+      <workItem from="1576271398335" duration="3787000" />
+      <workItem from="1576330888371" duration="647000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="569" y="348" key="com.intellij.ide.util.TipDialog" timestamp="1576330919378">
+      <screen x="0" y="0" width="1680" height="1010" />
+    </state>
+    <state x="-1264" y="309" key="com.intellij.ide.util.TipDialog/0.0.1680.1010/-1920.-34.1920.1040@-1920.-34.1920.1040" timestamp="1576271400757" />
+    <state x="569" y="348" key="com.intellij.ide.util.TipDialog/0.0.1680.1010/-1920.-34.1920.1040@0.0.1680.1010" timestamp="1576330919378" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
