@@ -44,7 +44,6 @@ use pocketmine\entity\vehicle\Boat;
 use pocketmine\event\entity\EntityDamageByEntityEvent;
 use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\inventory\InventoryCloseEvent;
-use pocketmine\event\Listener;
 use pocketmine\event\player\cheat\PlayerIllegalMoveEvent;
 use pocketmine\event\player\PlayerAchievementAwardedEvent;
 use pocketmine\event\player\PlayerAnimationEvent;
@@ -80,8 +79,8 @@ use pocketmine\form\Form;
 use pocketmine\form\FormValidationException;
 use pocketmine\form\ServerSettingsForm;
 use pocketmine\inventory\CraftingGrid;
+use pocketmine\inventory\PlayerCursorInventory;
 use pocketmine\inventory\PlayerOffHandInventory;
-use pocketmine\inventory\PlayerUIInventory;
 use pocketmine\inventory\transaction\action\InventoryAction;
 use pocketmine\inventory\transaction\CraftingTransaction;
 use pocketmine\inventory\transaction\TransactionValidationException;
@@ -162,9 +161,8 @@ use pocketmine\network\mcpe\protocol\types\ContainerIds;
 use pocketmine\network\mcpe\protocol\types\DimensionIds;
 use pocketmine\network\mcpe\protocol\types\PlayerPermissions;
 use pocketmine\network\mcpe\protocol\types\SkinAnimation;
-use pocketmine\network\mcpe\protocol\types\SkinCape;
+use pocketmine\network\mcpe\protocol\types\SkinData;
 use pocketmine\network\mcpe\protocol\types\SkinImage;
-use pocketmine\network\mcpe\protocol\types\UIInventoryOffsets;
 use pocketmine\network\mcpe\protocol\UpdateAttributesPacket;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
 use pocketmine\network\mcpe\VerifyLoginTask;
@@ -179,7 +177,6 @@ use pocketmine\tile\Spawnable;
 use pocketmine\tile\Tile;
 use pocketmine\tile\ItemFrame;
 use pocketmine\timings\Timings;
-use pocketmine\utils\Config;
 use pocketmine\utils\TextFormat;
 use pocketmine\utils\UUID;
 use function abs;
@@ -219,7 +216,7 @@ use const PHP_INT_MAX;
 /**
  * Main class that handles networking, recovery, and packet sending to the server part
  */
-class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Listener {
+class Player extends Human implements CommandSender, ChunkLoader, IPlayer{
 
 	public const SURVIVAL = 0;
 	public const CREATIVE = 1;
@@ -302,8 +299,8 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 	protected $windowIndex = [];
 	/** @var bool[] */
 	protected $permanentWindows = [];
-	/** @var PlayerUIInventory */
-	protected $uiInventory;
+	/** @var PlayerCursorInventory */
+	protected $cursorInventory;
 	/** @var PlayerOffHandInventory */
 	protected $offHandInventory;
 	/** @var CraftingGrid */
@@ -492,11 +489,11 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 	}
 
 	public function getFirstPlayed(){
-		return $this->namedtag instanceof CompoundTag ? $this->namedtag->getLong("firstPlayed", 0, true) : null;
+		return $this->namedtag->getLong("firstPlayed", 0, true);
 	}
 
 	public function getLastPlayed(){
-		return $this->namedtag instanceof CompoundTag ? $this->namedtag->getLong("lastPlayed", 0, true) : null;
+		return $this->namedtag->getLong("lastPlayed", 0, true);
 	}
 
 	public function hasPlayedBefore() : bool{
@@ -1149,7 +1146,7 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 		if($this->hasPermission(Server::BROADCAST_CHANNEL_USERS)){
 			PermissionManager::getInstance()->subscribeToPermission(Server::BROADCAST_CHANNEL_USERS, $this);
 		}
-		if($this->hasPermission(Server::BROADCAST_CHANNEL_ADMINISTRATIVE)) {
+		if($this->hasPermission(Server::BROADCAST_CHANNEL_ADMINISTRATIVE)){
 			PermissionManager::getInstance()->subscribeToPermission(Server::BROADCAST_CHANNEL_ADMINISTRATIVE, $this);
 		}
 
@@ -1161,28 +1158,6 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 		$ev->call();
 		if(strlen(trim((string) $ev->getJoinMessage())) > 0){
 			$this->server->broadcastMessage($ev->getJoinMessage());
-			if($this->server->getConfigString("onlyproxyjoin") == 1) {
-
-				if($ev->getPlayer()->getAddress() != "127.0.0.1") {
-
-					$ev->getPlayer()->kick($this->server->getConfigString("onlyproxyjoin-message"), false);
-
-				}
-
-			}
-
-			if($this->server->getConfigString("mute") == 1) {
-
-				if(!file_exists($this->server->getDataPath() . "extras/mute/players/" . $ev->getPlayer()->getName() . ".yml")) {
-
-					$playerdata = new Config($this->server->getDataPath() . "extras/mute/players/" . $ev->getPlayer()->getName() . ".yml", Config::YAML);
-					$playerdata->set("mute", false);
-					$playerdata->set("reason", null);
-					$playerdata->save();
-
-				}
-
-			}
 		}
 
 		$this->noDamageTicks = 60;
@@ -2061,17 +2036,19 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 			$animations[] = new SkinAnimation(new SkinImage($animation["ImageHeight"], $animation["ImageWidth"], base64_decode($animation["Image"])), $animation["Type"], $animation["Frames"]);
 		}
 
-		$skin = new Skin(
+		$skin = (new SkinData(
 			$packet->clientData["SkinId"],
-			new SkinImage($packet->clientData["SkinImageHeight"], $packet->clientData["SkinImageWidth"], base64_decode($packet->clientData["SkinData"])),
 			base64_decode($packet->clientData["SkinResourcePatch"]),
-			new SkinCape($packet->clientData["CapeId"], new SkinImage($packet->clientData["CapeImageHeight"], $packet->clientData["CapeImageHeight"], base64_decode($packet->clientData["CapeData"]))),
+			new SkinImage($packet->clientData["SkinImageHeight"], $packet->clientData["SkinImageWidth"], base64_decode($packet->clientData["SkinData"])),
 			$animations,
-			base64_decode($packet->clientData["SkinGeometryData"] ?? ""),
-			base64_decode($packet->clientData["SkinAnimationData"] ?? ""),
-			$packet->clientData["PersonaSkin"] ?? false,
-			$packet->clientData["PremiumSkin"] ?? false
-		);
+			new SkinImage($packet->clientData["CapeImageHeight"], $packet->clientData["CapeImageWidth"], base64_decode($packet->clientData["CapeData"])),
+			base64_decode($packet->clientData["SkinGeometryData"]),
+			base64_decode($packet->clientData["SkinAnimationData"]),
+			$packet->clientData["PremiumSkin"],
+			$packet->clientData["PersonaSkin"],
+			$packet->clientData["CapeOnClassicSkin"],
+			$packet->clientData["CapeId"]
+		))->asSkin();
 
 		if(!$skin->isValid()){
 			$this->close("", "disconnectionScreen.invalidSkin");
@@ -3158,10 +3135,6 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 	public function handleRespawn(RespawnPacket $packet) : bool{
 		if(!$this->isAlive() && $packet->respawnState === RespawnPacket::CLIENT_READY_TO_SPAWN){
 			$this->sendRespawnPacket($this, RespawnPacket::READY_TO_SPAWN);
-
-			if($this->level->getDimension() !== $this->getSpawn()->getLevel()->getDimension()){
-				$this->respawn();
-			}
 			return true;
 		}
 
@@ -3838,7 +3811,7 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 			$this->removeAllWindows(true);
 			$this->windows = [];
 			$this->windowIndex = [];
-			$this->uiInventory = null;
+			$this->cursorInventory = null;
 			$this->craftingGrid = null;
 
 			if($this->constructed){
@@ -3961,12 +3934,12 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 			if($this->armorInventory !== null){
 				$this->armorInventory->clearAll();
 			}
-			if($this->uiInventory !== null){
-				$this->uiInventory->clearAll();
+			if($this->cursorInventory !== null){
+				$this->cursorInventory->clearAll();
 			}
-            if($this->offHandInventory !== null){
-                $this->offHandInventory->clearAll();
-            }
+			if($this->offHandInventory !== null){
+				$this->offHandInventory->clearAll();
+			}
 		}
 
 		//TODO: allow this number to be manipulated during PlayerDeathEvent
@@ -4017,7 +3990,6 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 
 		$this->sendData($this);
 		$this->sendData($this->getViewers());
-		$this->sendAttributes(true);
 
 		$this->sendSettings();
 		$this->sendAllInventories();
@@ -4126,24 +4098,16 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 		$this->addWindow($this->getOffHandInventory(), ContainerIds::OFFHAND, true);
 		$this->addWindow($this->getArmorInventory(), ContainerIds::ARMOR, true);
 
-		$this->uiInventory = new PlayerUIInventory($this);
-		$this->addWindow($this->uiInventory, ContainerIds::UI, true);
+		$this->cursorInventory = new PlayerCursorInventory($this);
+		$this->addWindow($this->cursorInventory, ContainerIds::UI, true);
 
 		$this->craftingGrid = new CraftingGrid($this, CraftingGrid::SIZE_SMALL);
 
 		//TODO: more windows
 	}
 
-	/**
-	 * @deprecated
-	 * @return PlayerUIInventory
-	 */
-	public function getCursorInventory() : PlayerUIInventory{
-		return $this->uiInventory;
-	}
-
-	public function getUIInventory() : PlayerUIInventory{
-		return $this->uiInventory;
+	public function getCursorInventory() : PlayerCursorInventory{
+		return $this->cursorInventory;
 	}
 
 	public function getCraftingGrid() : CraftingGrid{
@@ -4158,25 +4122,19 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 	}
 
 	public function doCloseInventory() : void{
-		$contents = $this->craftingGrid->getContents();
-		if(count($contents) > 0){
-			$drops = $this->inventory->addItem(...$contents);
-			foreach($drops as $drop){
-				$this->dropItem($drop);
-			}
+		/** @var Inventory[] $inventories */
+		$inventories = [$this->craftingGrid, $this->cursorInventory];
+		foreach($inventories as $inventory){
+			$contents = $inventory->getContents();
+			if(count($contents) > 0){
+				$drops = $this->inventory->addItem(...$contents);
+				foreach($drops as $drop){
+					$this->dropItem($drop);
+				}
 
-			$this->craftingGrid->clearAll();
-		}
-
-		if(!$this->uiInventory->isSlotEmpty(UIInventoryOffsets::OFFSET_CURSOR)){ // cursor
-			if($this->inventory->canAddItem($item = $this->uiInventory->getItem(UIInventoryOffsets::OFFSET_CURSOR))){
-				$this->inventory->addItem($this->uiInventory->getItem(UIInventoryOffsets::OFFSET_CURSOR));
-			}else{
-				$this->dropItem($item);
+				$inventory->clearAll();
 			}
 		}
-
-		$this->uiInventory->clearAll();
 
 		if($this->craftingGrid->getGridWidth() > CraftingGrid::SIZE_SMALL){
 			$this->craftingGrid = new CraftingGrid($this, CraftingGrid::SIZE_SMALL);
@@ -4363,14 +4321,14 @@ class Player extends Human implements CommandSender, ChunkLoader, IPlayer, Liste
 	}
 
 	public function getDeviceOS(): ?int{
-	    return $this->deviceOS;
-    }
+		return $this->deviceOS;
+	}
 
-    public function getDeviceModel(): ?string{
-	    return $this->deviceModel;
-    }
+	public function getDeviceModel(): ?string{
+		return $this->deviceModel;
+	}
 
-    public function getDeviceId(): ?string{
-	    return $this->deviceId;
-    }
+	public function getDeviceId(): ?string{
+		return $this->deviceId;
+	}
 }

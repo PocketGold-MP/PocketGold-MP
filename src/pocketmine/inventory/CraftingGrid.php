@@ -24,13 +24,12 @@ declare(strict_types=1);
 namespace pocketmine\inventory;
 
 use pocketmine\item\Item;
-use pocketmine\network\mcpe\protocol\types\UIInventoryOffsets;
 use pocketmine\Player;
 use function max;
 use function min;
 use const PHP_INT_MAX;
 
-class CraftingGrid extends BaseInventory implements FakeInventory{
+class CraftingGrid extends BaseInventory{
 	public const SIZE_SMALL = 2;
 	public const SIZE_BIG = 3;
 
@@ -51,7 +50,6 @@ class CraftingGrid extends BaseInventory implements FakeInventory{
 	public function __construct(Player $holder, int $gridWidth){
 		$this->holder = $holder;
 		$this->gridWidth = $gridWidth;
-
 		parent::__construct();
 	}
 
@@ -61,10 +59,6 @@ class CraftingGrid extends BaseInventory implements FakeInventory{
 
 	public function getDefaultSize() : int{
 		return $this->getGridWidth() ** 2;
-	}
-
-	public function getUIOffset() : int{
-		return $this->gridWidth === self::SIZE_SMALL ? UIInventoryOffsets::OFFSET_CRAFTING_SMALL : UIInventoryOffsets::OFFSET_CRAFTING_BIG;
 	}
 
 	public function setSize(int $size){

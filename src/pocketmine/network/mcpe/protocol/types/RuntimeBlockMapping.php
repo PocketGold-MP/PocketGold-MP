@@ -28,8 +28,6 @@ use pocketmine\nbt\NBT;
 use pocketmine\nbt\NetworkLittleEndianNBTStream;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\ListTag;
-use pocketmine\nbt\tag\StringTag;
-use pocketmine\utils\BinaryDataException;
 use function file_get_contents;
 use function getmypid;
 use function json_decode;
@@ -124,6 +122,10 @@ final class RuntimeBlockMapping{
 	 * @return CompoundTag[]
 	 */
 	private static function randomizeTable(array $table) : array{
+		$postSeed = mt_rand(); //save a seed to set afterwards, to avoid poor quality randoms
+		mt_srand(getmypid() ?: 0); //Use a seed which is the same on all threads. This isn't a secure seed, but we don't care.
+		shuffle($table);
+		mt_srand($postSeed); //restore a good quality seed that isn't dependent on PID
 		return $table;
 	}
 

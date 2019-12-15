@@ -23,45 +23,34 @@ declare(strict_types=1);
 
 namespace pocketmine\inventory;
 
-use pocketmine\level\Position;
-use pocketmine\network\mcpe\protocol\types\WindowTypes;
 use pocketmine\Player;
 
-class EnchantInventory extends ContainerInventory implements FakeInventory{
-
-	/** @var Position */
+class PlayerCursorInventory extends BaseInventory{
+	/** @var Player */
 	protected $holder;
 
-	public function __construct(Position $pos){
-		parent::__construct($pos->asPosition());
-	}
-
-	public function getNetworkType() : int{
-		return WindowTypes::ENCHANTMENT;
+	public function __construct(Player $holder){
+		$this->holder = $holder;
+		parent::__construct();
 	}
 
 	public function getName() : string{
-		return "Enchantment Table";
+		return "Cursor";
 	}
 
 	public function getDefaultSize() : int{
-		return 2; //1 input, 1 lapis
+		return 1;
+	}
+
+	public function setSize(int $size){
+		throw new \BadMethodCallException("Cursor can only carry one item at a time");
 	}
 
 	/**
 	 * This override is here for documentation and code completion purposes only.
-	 * @return Position
+	 * @return Player
 	 */
 	public function getHolder(){
 		return $this->holder;
-	}
-
-	public function onClose(Player $who) : void{
-		parent::onClose($who);
-
-		foreach($this->getContents() as $item){
-			$who->dropItem($item);
-		}
-		$this->clearAll();
 	}
 }

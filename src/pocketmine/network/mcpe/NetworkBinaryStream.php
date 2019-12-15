@@ -38,10 +38,9 @@ use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\IntTag;
 use pocketmine\network\mcpe\protocol\types\CommandOriginData;
 use pocketmine\network\mcpe\protocol\types\EntityLink;
-use pocketmine\network\mcpe\protocol\types\SkinCape;
+use pocketmine\network\mcpe\protocol\types\SkinAnimation;
 use pocketmine\network\mcpe\protocol\types\SkinData;
 use pocketmine\network\mcpe\protocol\types\SkinImage;
-use pocketmine\network\mcpe\protocol\types\SkinAnimation;
 use pocketmine\network\mcpe\protocol\types\StructureSettings;
 use pocketmine\utils\BinaryStream;
 use pocketmine\utils\UUID;
@@ -87,9 +86,9 @@ class NetworkBinaryStream extends BinaryStream{
 		$animations = [];
 		for($i = 0; $i < $animationCount; ++$i){
 			$animations[] = new SkinAnimation(
-				$skinImage = $this->getSkinImage(),
-				$animationType = $this->getLInt(),
-				$animationFrames = $this->getLFloat()
+				$this->getSkinImage(),
+				$this->getLInt(),
+				$this->getLFloat()
 			);
 		}
 		$capeData = $this->getSkinImage();
@@ -101,12 +100,14 @@ class NetworkBinaryStream extends BinaryStream{
 		$capeId = $this->getString();
 		$fullSkinId = $this->getString();
 
-		return new Skin($skinId, $skinData, $skinResourcePatch, new SkinCape($capeId, $capeData, $capeOnClassic), $animations, $geometryData, $animationData, $persona, $premium);
+		return (new SkinData($skinId, $skinResourcePatch, $skinData, $animations, $capeData, $geometryData, $animationData, $premium, $persona, $capeOnClassic, $capeId))->asSkin();
 	}
 
 	public function putSkin(Skin $skin){
+		$skin = $skin->asSkinData();
+
 		$this->putString($skin->getSkinId());
-		$this->putString($skin->getResourcePatch()); //resource patch
+		$this->putString($skin->getResourcePatch());
 		$this->putSkinImage($skin->getSkinImage());
 		$this->putLInt(count($skin->getAnimations()));
 		foreach($skin->getAnimations() as $animation){
@@ -114,13 +115,13 @@ class NetworkBinaryStream extends BinaryStream{
 			$this->putLInt($animation->getType());
 			$this->putLFloat($animation->getFrames());
 		}
-		$this->putSkinImage($skin->getCape()->getImage());
+		$this->putSkinImage($skin->getCapeImage());
 		$this->putString($skin->getGeometryData());
 		$this->putString($skin->getAnimationData());
 		$this->putBool($skin->isPremium());
 		$this->putBool($skin->isPersona());
-		$this->putBool($skin->getCape()->isOnClassicSkin());
-		$this->putString($skin->getCape()->getId());
+		$this->putBool($skin->isPersonaCapeOnClassic());
+		$this->putString($skin->getCapeId());
 
 		//this has to be unique or the client will do stupid things
 		$this->putString(UUID::fromRandom()->toString()); //full skin ID
@@ -130,7 +131,6 @@ class NetworkBinaryStream extends BinaryStream{
 		$width = $this->getLInt();
 		$height = $this->getLInt();
 		$data = $this->getString();
-
 		return new SkinImage($height, $width, $data);
 	}
 

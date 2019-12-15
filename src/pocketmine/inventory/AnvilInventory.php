@@ -36,13 +36,11 @@ use pocketmine\item\Item;
 use pocketmine\item\ItemFactory;
 use pocketmine\item\ItemIds;
 use pocketmine\level\Position;
-use pocketmine\nbt\tag\ListTag;
 use pocketmine\network\mcpe\protocol\LevelEventPacket;
-use pocketmine\network\mcpe\protocol\types\UIInventoryOffsets;
 use pocketmine\network\mcpe\protocol\types\WindowTypes;
 use pocketmine\Player;
 
-class AnvilInventory extends ContainerInventory implements FakeInventory, FakeResultInventory{
+class AnvilInventory extends ContainerInventory implements FakeInventory{
 
 	public const SLOT_INPUT = 0;
 	public const SLOT_SACRIFICE = 1;
@@ -63,16 +61,12 @@ class AnvilInventory extends ContainerInventory implements FakeInventory, FakeRe
 		return "Anvil";
 	}
 
-	public function getUIOffset() : int{
-		return UIInventoryOffsets::OFFSET_ANVIL;
-	}
-
 	public function getDefaultSize() : int{
 		return 3; //1 input, 1 sacrifice, 1 output
 	}
 
-	public function getResultSlot() : int{
-		return self::SLOT_OUTPUT;
+	public function isOutputFull() : bool{
+		return !$this->getItem(self::SLOT_OUTPUT)->isNull();
 	}
 
 	/**
@@ -302,7 +296,7 @@ class AnvilInventory extends ContainerInventory implements FakeInventory, FakeRe
 		}
 
 		if($same){
-			$output->setNamedTagEntry($result->getNamedTagEntry(Item::TAG_ENCH) ?? new ListTag(Item::TAG_ENCH, []));
+			$output->setNamedTagEntry($result->getNamedTagEntry(Item::TAG_ENCH));
 		}
 	}
 
