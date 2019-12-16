@@ -1,7 +1,5 @@
-# PocketGold-MP
- 
-Eine Server version basiert auf PocketMine-MP
+#PocketGold-MP
 
-Die sich aber schneller updatet und bug freier ist!
+Forked by Altay and PMMP!
 
 Discord: https://discord.gg/zQJfJzV
