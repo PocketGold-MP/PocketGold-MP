@@ -1,4 +1,4 @@
-<h1>PocketGold-MP<img src="" height="64" width="64" align="left"></img></h1>
+<h1>PocketGold-MP<img src="https://pocketgold.de/icons/github/github.png" height="64" width="64" align="left"></img></h1>
 <br />
 
 A feature-rich server software for Minecraft: Bedrock/W10 Edition. PocketGold-MP is a fork of [Altay](https://github.com/TuranicTeam/Altay)
